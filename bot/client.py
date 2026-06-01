@@ -163,3 +163,10 @@ class BinanceFuturesClient:
         # The full order response is the key audit record -- log it in one line.
         log.info("Order response: %s", result)
         return result
+
+    def get_order(self, symbol, order_id):
+        """Query the current state of a single order."""
+        return self._request(
+            "GET", "/fapi/v1/order",
+            params={"symbol": symbol, "orderId": order_id}, signed=True,
+        )

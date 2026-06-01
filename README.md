@@ -9,7 +9,12 @@ It talks to the testnet with plain signed REST calls (`requests` + HMAC-SHA256) 
 no third-party Binance SDK — so there's nothing hidden and it runs anywhere
 Python does.
 
-Base URL used for all calls: `https://testnet.binancefuture.com`
+> **Note on the testnet endpoint.** Binance migrated the futures testnet: the old
+> `testnet.binancefuture.com` site now redirects to **demo.binance.com** ("Demo
+> Trading"), whose futures API base is **`https://demo-fapi.binance.com`**. Both
+> share the same `/fapi` API, so the bot works with either — the base URL is set
+> in `.env`. The sample logs in this repo were captured against
+> `demo-fapi.binance.com`.
 
 ---
 
@@ -56,12 +61,13 @@ PrimeTrade-Ai/
 
 ### 1. Get Binance Futures Testnet API keys
 
-1. Go to **https://testnet.binancefuture.com** and log in (register a testnet
-   account if you don't have one — it's separate from real Binance and uses fake
-   funds).
-2. On the futures trading page, scroll to the **API Key** panel at the bottom.
-3. Copy the **API Key** and **Secret Key**. The testnet pre-funds your account
-   with mock USDT, which is enough to place the test orders.
+1. Go to **https://demo.binance.com** (Demo Trading — fake funds, separate from
+   real Binance). The old `https://testnet.binancefuture.com` also works if it's
+   reachable for you; it now redirects here.
+2. Open **Account → API Management** and create an HMAC key, or use the **API
+   Key** panel on the futures page.
+3. Copy the **API Key** and **Secret Key** with the *Copy* buttons. The demo
+   account is pre-funded with mock USDT, which is enough to place the test orders.
 
 ### 2. Install
 
@@ -83,7 +89,9 @@ cp .env.example .env
 ```
 BINANCE_API_KEY=your_testnet_api_key
 BINANCE_API_SECRET=your_testnet_api_secret
-BINANCE_BASE_URL=https://testnet.binancefuture.com
+# demo.binance.com -> https://demo-fapi.binance.com
+# classic testnet  -> https://testnet.binancefuture.com
+BINANCE_BASE_URL=https://demo-fapi.binance.com
 ```
 
 `.env` is gitignored, so your keys won't be committed.
@@ -177,6 +185,10 @@ Everything is written to `logs/trading_bot.log` (a rotating file handler, 1 MB �
 - the order request and the full order response
 - API errors (Binance code + message) and network errors
 
+Real captured examples are committed in this repo:
+- [`logs/sample_market_order.log`](logs/sample_market_order.log) — a filled MARKET order
+- [`logs/sample_limit_order.log`](logs/sample_limit_order.log) — a resting LIMIT order
+
 The API secret and the request signature are **never** logged — they're redacted
 before the parameters are written. The terminal stays clean (the CLI prints its
 own summaries); the file is the full audit trail.
@@ -216,6 +228,14 @@ Full details (including tracebacks for anything unexpected) go to the log file.
   minimum-notional check uses the limit price; for market orders the exchange
   validates notional on its side (BTCUSDT requires roughly 0.002 BTC to clear
   the 50 USDT minimum at current prices).
+- Market orders are re-queried once after placement so the output shows the
+  actual fill (`FILLED` + average price), since the demo endpoint acknowledges
+  them as `NEW` and fills a moment later.
+- **Stop-Limit (`STOP`)**: implemented against the standard `/fapi/v1/order`
+  endpoint, which is how the classic testnet handles it. The newer
+  `demo-fapi.binance.com` endpoint rejects conditional orders here with
+  `-4120` ("use the Algo Order API endpoints instead"); the bot surfaces that
+  cleanly. Market and Limit (the required types) work on both endpoints.
 - `python-binance` is intentionally not used — direct REST keeps dependencies
   minimal and the signing logic transparent.
 
@@ -226,8 +246,10 @@ Full details (including tracebacks for anything unexpected) go to the log file.
 - **`Missing API credentials`** — you haven't created `.env` (copy it from
   `.env.example`) or the values are blank.
 - **`API-key format invalid` (-2014) / `Invalid API-key` (-2015)** — the key in
-  `.env` is wrong, or it's a spot/production key rather than a futures-testnet
-  key.
+  `.env` is wrong, or it doesn't match the `BINANCE_BASE_URL` you set. A
+  `demo.binance.com` key only works with `https://demo-fapi.binance.com`, and a
+  classic-testnet key only with `https://testnet.binancefuture.com`. (`-2015`
+  can also mean an IP restriction is set on the key.)
 - **`Timestamp ... ahead of the server`** — the bot syncs to the server clock
   automatically before each order, but a wildly wrong system clock can still trip
   this; fix your machine's time.

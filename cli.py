@@ -16,9 +16,9 @@ package to place the order, and prints the result. All the API work lives in
 """
 
 import argparse
-import logging
 import os
 import sys
+import time
 
 from bot.client import DEFAULT_BASE_URL, BinanceFuturesClient
 from bot.exceptions import (
@@ -147,6 +147,9 @@ def place_order(client, *, symbol, side, order_type, quantity, price=None,
     manager = OrderManager(client)
     if order_type == "MARKET":
         response = manager.place_market_order(symbol, side, quantity)
+        # Some endpoints ack a market order as NEW and fill it asynchronously;
+        # re-query briefly so we can report the actual fill price.
+        response = _wait_for_fill(client, response)
     elif order_type == "LIMIT":
         response = manager.place_limit_order(symbol, side, quantity, price, tif)
     else:  # STOP (stop-limit)
@@ -156,6 +159,25 @@ def place_order(client, *, symbol, side, order_type, quantity, price=None,
     print_response(response)
     print("\n[OK] Order placed successfully.")
     return response
+
+
+def _wait_for_fill(client, response, attempts=5, delay=0.4):
+    """Re-query a freshly placed order until it leaves the NEW state.
+
+    Market orders may fill a moment after the initial acknowledgement, so this
+    returns the latest order state (or the last seen state if it never settles
+    within the given attempts).
+    """
+    if response.get("status") != "NEW":
+        return response
+    symbol, order_id = response.get("symbol"), response.get("orderId")
+    latest = response
+    for _ in range(attempts):
+        time.sleep(delay)
+        latest = client.get_order(symbol, order_id)
+        if latest.get("status") != "NEW":
+            break
+    return latest
 
 
 # --------------------------------------------------------------------------

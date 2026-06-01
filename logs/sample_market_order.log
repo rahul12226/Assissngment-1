@@ -1,0 +1,11 @@
+2026-06-01 13:57:29,661 | DEBUG    | tradingbot.client | Request GET /fapi/v1/exchangeInfo params={}
+2026-06-01 13:57:31,162 | DEBUG    | tradingbot.client | Response GET /fapi/v1/exchangeInfo -> HTTP 200
+2026-06-01 13:57:31,165 | DEBUG    | tradingbot.client | Request GET /fapi/v1/time params={}
+2026-06-01 13:57:31,332 | DEBUG    | tradingbot.client | Response GET /fapi/v1/time -> HTTP 200
+2026-06-01 13:57:31,332 | DEBUG    | tradingbot.client | Clock synced, offset=1707ms
+2026-06-01 13:57:31,332 | INFO     | tradingbot.client | Placing order request: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': '0.002'}
+2026-06-01 13:57:31,334 | DEBUG    | tradingbot.client | Request POST /fapi/v1/order params={'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': '0.002', 'timestamp': 1780302453041, 'recvWindow': 5000, 'signature': '***redacted***'}
+2026-06-01 13:57:31,516 | DEBUG    | tradingbot.client | Response POST /fapi/v1/order -> HTTP 200
+2026-06-01 13:57:31,516 | INFO     | tradingbot.client | Order response: {'orderId': 13677309223, 'symbol': 'BTCUSDT', 'status': 'NEW', 'clientOrderId': '7grTg9pE55R2HSNIfmsMds', 'price': '0.00', 'avgPrice': '0.00', 'origQty': '0.0020', 'executedQty': '0.0000', 'cumQty': '0.0000', 'cumQuote': '0.000000', 'timeInForce': 'GTC', 'type': 'MARKET', 'reduceOnly': False, 'closePosition': False, 'side': 'BUY', 'positionSide': 'BOTH', 'stopPrice': '0.00', 'workingType': 'CONTRACT_PRICE', 'priceProtect': False, 'origType': 'MARKET', 'priceMatch': 'NONE', 'selfTradePreventionMode': 'EXPIRE_MAKER', 'goodTillDate': 0, 'updateTime': 1780302453230}
+2026-06-01 13:57:31,917 | DEBUG    | tradingbot.client | Request GET /fapi/v1/order params={'symbol': 'BTCUSDT', 'orderId': 13677309223, 'timestamp': 1780302453624, 'recvWindow': 5000, 'signature': '***redacted***'}
+2026-06-01 13:57:32,115 | DEBUG    | tradingbot.client | Response GET /fapi/v1/order -> HTTP 200
