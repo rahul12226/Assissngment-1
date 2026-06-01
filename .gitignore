@@ -1,0 +1,19 @@
+# Secrets -- never commit real API keys
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Logs (sample logs are committed explicitly; ignore the rotating live log)
+logs/trading_bot.log
+logs/trading_bot.log.*
+
+# OS / editor noise
+.DS_Store
+.idea/
+.vscode/

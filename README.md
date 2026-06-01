@@ -1,0 +1,233 @@
+# Binance Futures Testnet Trading Bot
+
+A small command-line trading bot for the **Binance USDT-M Futures Testnet**. It
+places **Market**, **Limit** and **Stop-Limit** orders, validates your input
+against the exchange's own rules, and logs every request, response and error to a
+file so you can see exactly what happened.
+
+It talks to the testnet with plain signed REST calls (`requests` + HMAC-SHA256) —
+no third-party Binance SDK — so there's nothing hidden and it runs anywhere
+Python does.
+
+Base URL used for all calls: `https://testnet.binancefuture.com`
+
+---
+
+## Features
+
+- Market, Limit **and** Stop-Limit (bonus third order type) orders
+- Both sides: **BUY** and **SELL**
+- Two ways to drive it:
+  - **flags** for one-shot / scriptable orders
+  - an **interactive menu** that prompts for each field with validation (bonus)
+- Input validation *before* anything is sent — symbol, side, type, quantity,
+  price — plus rounding to the symbol's real step size / tick size and a
+  minimum-notional check, so you don't get cryptic exchange rejections
+- Clear terminal output: a request summary, the parsed response
+  (`orderId`, `status`, `executedQty`, `avgPrice`), and a success/failure line
+- File logging of API requests, responses and errors (secrets are redacted)
+- Layered code: API client, order logic, validation, logging and CLI are
+  separate and reusable
+
+---
+
+## Project structure
+
+```
+PrimeTrade-Ai/
+├── bot/
+│   ├── __init__.py
+│   ├── client.py          # BinanceFuturesClient — signed REST wrapper
+│   ├── orders.py          # OrderManager — market / limit / stop-limit
+│   ├── validators.py      # input validation + exchange-filter rounding
+│   ├── logging_config.py  # rotating file logging + secret redaction
+│   └── exceptions.py      # ValidationError / BinanceAPIError / NetworkError
+├── cli.py                 # CLI entry point (flags + interactive menu)
+├── requirements.txt
+├── .env.example           # template for your API keys
+├── .gitignore
+├── logs/                  # log files land here (created on first run)
+└── README.md
+```
+
+---
+
+## Setup
+
+### 1. Get Binance Futures Testnet API keys
+
+1. Go to **https://testnet.binancefuture.com** and log in (register a testnet
+   account if you don't have one — it's separate from real Binance and uses fake
+   funds).
+2. On the futures trading page, scroll to the **API Key** panel at the bottom.
+3. Copy the **API Key** and **Secret Key**. The testnet pre-funds your account
+   with mock USDT, which is enough to place the test orders.
+
+### 2. Install
+
+```bash
+# from the project folder
+python -m pip install -r requirements.txt
+```
+
+Requires Python 3.9+ (developed and tested on Python 3.14).
+
+### 3. Add your credentials
+
+Copy the example file and fill in your keys:
+
+```bash
+cp .env.example .env
+```
+
+```
+BINANCE_API_KEY=your_testnet_api_key
+BINANCE_API_SECRET=your_testnet_api_secret
+BINANCE_BASE_URL=https://testnet.binancefuture.com
+```
+
+`.env` is gitignored, so your keys won't be committed.
+
+---
+
+## Usage
+
+### Flag mode
+
+```bash
+# Market BUY
+python cli.py --symbol BTCUSDT --side BUY --type MARKET --quantity 0.002
+
+# Limit SELL (rests on the book until price is hit)
+python cli.py --symbol BTCUSDT --side SELL --type LIMIT --quantity 0.002 --price 70000
+
+# Stop-Limit BUY (triggers at --stop-price, then places a limit at --price)
+python cli.py --symbol BTCUSDT --side BUY --type STOP --quantity 0.002 --price 72000 --stop-price 71500
+```
+
+Add `-y` / `--yes` to skip the confirmation prompt.
+
+| Flag | Meaning | Required |
+|------|---------|----------|
+| `--symbol` | Trading pair, e.g. `BTCUSDT` | yes |
+| `--side` | `BUY` or `SELL` | yes |
+| `--type` | `MARKET`, `LIMIT` or `STOP` | yes |
+| `--quantity` | Order size in the base asset | yes |
+| `--price` | Limit price | for `LIMIT` and `STOP` |
+| `--stop-price` | Trigger price | for `STOP` |
+| `--tif` | Time in force: `GTC`/`IOC`/`FOK`/`GTX` (default `GTC`) | no |
+| `-y`, `--yes` | Skip the confirmation prompt | no |
+| `-i`, `--interactive` | Launch the interactive menu | no |
+
+### Interactive mode
+
+Run with no order flags (or pass `--interactive`) and the bot walks you through
+each field, re-prompting on bad input:
+
+```bash
+python cli.py --interactive
+```
+
+```
+============================================
+  Binance Futures Testnet - Interactive Order
+============================================
+Symbol [BTCUSDT]: BTCUSDT
+Side (BUY/SELL): BUY
+Order type (MARKET/LIMIT/STOP): MARKET
+Quantity: 0.002
+```
+
+### Example output
+
+```
+============================================
+  ORDER REQUEST
+============================================
+  Symbol      : BTCUSDT
+  Side        : BUY
+  Type        : MARKET
+  Quantity    : 0.002
+============================================
+
+============================================
+  ORDER RESPONSE
+============================================
+  Order ID    : 4012345678
+  Symbol      : BTCUSDT
+  Status      : FILLED
+  Side        : BUY
+  Type        : MARKET
+  Orig Qty    : 0.002
+  Executed Qty: 0.002
+  Avg Price   : 67250.10
+============================================
+
+[OK] Order placed successfully.
+```
+
+---
+
+## Logging
+
+Everything is written to `logs/trading_bot.log` (a rotating file handler, 1 MB ×
+3 backups). The log captures:
+
+- each outgoing request (method, path, parameters)
+- the order request and the full order response
+- API errors (Binance code + message) and network errors
+
+The API secret and the request signature are **never** logged — they're redacted
+before the parameters are written. The terminal stays clean (the CLI prints its
+own summaries); the file is the full audit trail.
+
+Sample log line for a placed order:
+
+```
+2026-06-01 12:48:16 | INFO | tradingbot.client | Placing order request: {'symbol': 'BTCUSDT', 'side': 'BUY', 'type': 'MARKET', 'quantity': '0.002'}
+2026-06-01 12:48:16 | DEBUG | tradingbot.client | Request POST /fapi/v1/order params={..., 'signature': '***redacted***'}
+2026-06-01 12:48:17 | INFO | tradingbot.client | Order response: {'orderId': 4012345678, 'status': 'FILLED', ...}
+```
+
+---
+
+## Error handling
+
+The bot distinguishes three failure types and exits with a matching code:
+
+| Situation | Message | Exit code |
+|-----------|---------|-----------|
+| Bad user input (e.g. missing price on a LIMIT order, quantity below the minimum) | `[INPUT ERROR] ...` | 2 |
+| Binance rejected the order (e.g. insufficient margin, invalid key) | `[API ERROR] ... (code -xxxx)` | 1 |
+| Couldn't reach the API (timeout, DNS) | `[NETWORK ERROR] ...` | 1 |
+
+Full details (including tracebacks for anything unexpected) go to the log file.
+
+---
+
+## Assumptions
+
+- Targets the **USDT-M Futures Testnet** only (`/fapi/v1`), not spot or the
+  production exchange.
+- The account is in **one-way** position mode (the default). Hedge mode would
+  need an extra `positionSide` parameter.
+- Quantity is snapped **down** to the lot step size, and price is rounded to the
+  nearest tick, so the values sent always satisfy the exchange filters. The
+  minimum-notional check uses the limit price; for market orders the exchange
+  validates notional on its side (BTCUSDT requires roughly 0.002 BTC to clear
+  the 50 USDT minimum at current prices).
+- `python-binance` is intentionally not used — direct REST keeps dependencies
+  minimal and the signing logic transparent.
+
+---
+
+## Quick troubleshooting
+
+- **`Missing API credentials`** — you haven't created `.env` (copy it from
+  `.env.example`) or the values are blank.
+- **`API-key format invalid` (-2014) / `Invalid API-key` (-2015)** — the key in
+  `.env` is wrong, or it's a spot/production key rather than a futures-testnet
+  key.
+- **`Timestamp ... ahead of the server`** — the bot syncs to the server clock
+  automatically before each order, but a wildly wrong system clock can still trip
+  this; fix your machine's time.
